@@ -1,39 +1,54 @@
 <script lang="ts">
     import supabase from "$lib/db"
-    import { onMount, beforeUpdate } from "svelte";
+    import { onMount, beforeUpdate, onDestroy } from "svelte";
     import type { TodoType } from "../models/todo.interface"
     import { TodoModel } from "$lib/todo.model"
     import Todo  from "../components/Todo.svelte"
-    let todoRecords: TodoType[];
-    let todo= new TodoModel();
+    import { fetchTodoList, todoList } from '../stores/todostore'
 
+
+
+    let todoRecords: TodoModel[];
+    let todo = new TodoModel();
+
+     // Invoke the store methos to fetch todos
+     fetchTodoList()
+
+   /* beforeUpdate(() => {
+        fetchTodoList();
+    }) 
+
+    onDestroy(() => {
+        fetchTodoList()
+    })*/
+
+   
+ 
+    // Add recativity to specific valuables
+
+    $: {
+        todoRecords = [...$todoList]
+    }
 
     
 
-    onMount( async () => {
-           await getAllTodos();
-    } );
+   
 
-    const getAllTodos = async () => {
-        try {
-            let { data: todos, error } = await supabase.from('todos').select('*');
-            todoRecords =  todos;
-            console.log(`Getting all todos .......`);
-            console.table(todoRecords);
-        } catch (error) {
-            console.log(error);
-        }
-    }
-
+   
     const updateTodo = async (todo: TodoType) => {
             try {
-                const { data, error } = await supabase
+                const { data: record, error } = await supabase
                 .from('todos')
                 .update(todo)
                 .eq('id', todo.id)
-                console.log(`Results of update`);
-                console.table(data[0]);
-                await getAllTodos();
+
+
+                const i = todoRecords.findIndex(t => t.id === todo.id)
+                        todoRecords[i] = { ...todoRecords[i], ...todo}
+
+               
+                console.log(`Updated Record.........`);
+                console.table(todoRecords[i]);
             } catch(error) {
                 console.log(error);
             }            
@@ -47,9 +62,8 @@
                 .from('todos')
                 .delete()
                 .eq('id', TodoID)
-                await getAllTodos();
-                console.log(`Deleted Row: `);
-                console.table(data)
+               
+               todoRecords = todoRecords.filter(t => t.id !== TodoID)
 
             } catch(error) {
                 console.log(error);
@@ -67,11 +81,14 @@
                 {task: todo.task},
             ])
 
-            // Refresh List
-            await getAllTodos();
-
             console.log(`Inserted Data`);
             console.log(data)
+
+            todoRecords = [...todoRecords, {...data[0]}]
+            // Reset the task object
+
+            todo = {};
+
 
         }catch(error) {
             console.log(error);
@@ -82,7 +99,7 @@
 
 <!-- Add Todo Form -->
 
-<form class="form" on:submit|once|preventDefault={handleInsert}>
+<form class="form" on:submit|preventDefault={handleInsert}>
     <input type="text" bind:value={todo.task } />
     <button type="submit">Add Task</button>
 </form>
